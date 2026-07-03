@@ -136,13 +136,24 @@ router.post('/verify-2fa', async (req, res) => {
 
     console.log('🔑 Verifying 2FA password...');
 
-    // Get the current password info and compute SRP
-    const passwordInfo = await client.invoke(new Api.account.GetPassword());
-    const passwordSrp = await client.computeSrpParams(passwordInfo, password);
-
-    await client.invoke(
-      new Api.auth.CheckPassword({ password: passwordSrp })
-    );
+    try {
+      if (typeof client.checkPassword === 'function') {
+        await client.checkPassword(password);
+      } else {
+        const passwordInfo = await client.invoke(new Api.account.GetPassword());
+        const passwordSrp = await client.computeSrpParams(passwordInfo, password);
+        await client.invoke(new Api.auth.CheckPassword({ password: passwordSrp }));
+      }
+    } catch (checkErr) {
+      if (checkErr.errorMessage === 'PASSWORD_HASH_INVALID') {
+        throw checkErr;
+      }
+      // Fallback to signInWithPassword
+      await client.signInWithPassword(
+        { apiId: API_ID, apiHash: API_HASH },
+        { password: () => Promise.resolve(password) }
+      );
+    }
 
     // Success — save session
     saveSession();
@@ -150,10 +161,14 @@ router.post('/verify-2fa', async (req, res) => {
     console.log('✅ 2FA verification successful!');
     res.json({ success: true });
   } catch (err) {
-    console.error('❌ 2FA verification failed:', err.message);
-    res.status(500).json({
-      error: 'Failed to verify 2FA password',
-      message: err.message,
+    console.error('❌ 2FA verification failed:', err);
+    const msg = err.errorMessage || err.message || 'Incorrect 2FA password';
+    const displayMsg = (msg === 'PASSWORD_HASH_INVALID' || msg === 'PASSWORD_EMPTY')
+      ? 'Incorrect 2FA password. Please try again.'
+      : msg;
+    res.status(400).json({
+      error: displayMsg,
+      message: displayMsg,
     });
   }
 });
