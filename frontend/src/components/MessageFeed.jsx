@@ -84,7 +84,6 @@ export default function MessageFeed({
   hasMore,
 }) {
   const feedRef = useRef(null);
-  const [mediaFilter, setMediaFilter] = useState('all'); // 'all' | 'photo' | 'video' | 'document' | 'link'
   const [copiedId, setCopiedId] = useState(null);
 
   /* Auto-scroll to bottom when new messages arrive */
@@ -94,20 +93,7 @@ export default function MessageFeed({
     }
   }, [messages.length, loading]);
 
-  /* Filter messages by selected media filter */
-  const filteredMessages = messages.filter((msg) => {
-    if (mediaFilter === 'all') return true;
-    const isPhoto = msg.hasPhoto || msg.photo || msg.mediaType === 'photo';
-    const isVideo = msg.hasVideo || msg.video || msg.mediaType === 'video' || msg.mediaType === 'gif';
-    const isDocument = msg.hasDocument || msg.mediaType === 'document';
-    const hasLink = msg.text && (msg.text.includes('http://') || msg.text.includes('https://') || msg.text.includes('t.me/'));
 
-    if (mediaFilter === 'photo') return isPhoto;
-    if (mediaFilter === 'video') return isVideo;
-    if (mediaFilter === 'document') return isDocument;
-    if (mediaFilter === 'link') return hasLink;
-    return true;
-  });
 
   const handleCopyText = (msgId, text) => {
     if (!text) return;
@@ -137,43 +123,9 @@ export default function MessageFeed({
           <p>
             {loading
               ? 'Loading messages…'
-              : `${filteredMessages.length} message${filteredMessages.length !== 1 ? 's' : ''}`}
+              : `${messages.length} message${messages.length !== 1 ? 's' : ''}`}
             {groupInfo?.username && ` • @${groupInfo.username}`}
           </p>
-        </div>
-
-        {/* Media Filter Options Bar */}
-        <div className="filter-options-bar">
-          <button
-            className={`filter-chip ${mediaFilter === 'all' ? 'active' : ''}`}
-            onClick={() => setMediaFilter('all')}
-          >
-            All
-          </button>
-          <button
-            className={`filter-chip ${mediaFilter === 'photo' ? 'active' : ''}`}
-            onClick={() => setMediaFilter('photo')}
-          >
-            📷 Photos
-          </button>
-          <button
-            className={`filter-chip ${mediaFilter === 'video' ? 'active' : ''}`}
-            onClick={() => setMediaFilter('video')}
-          >
-            🎥 Videos
-          </button>
-          <button
-            className={`filter-chip ${mediaFilter === 'document' ? 'active' : ''}`}
-            onClick={() => setMediaFilter('document')}
-          >
-            📄 Files
-          </button>
-          <button
-            className={`filter-chip ${mediaFilter === 'link' ? 'active' : ''}`}
-            onClick={() => setMediaFilter('link')}
-          >
-            🔗 Links
-          </button>
         </div>
       </div>
 
@@ -189,12 +141,12 @@ export default function MessageFeed({
 
         {loading ? (
           <SkeletonMessages />
-        ) : filteredMessages.length === 0 ? (
+        ) : messages.length === 0 ? (
           <div className="no-messages">
-            <p>No messages match the selected filter.</p>
+            <p>No messages available.</p>
           </div>
         ) : (
-          filteredMessages.map((msg, index) => {
+          messages.map((msg, index) => {
             const isPhoto = msg.hasPhoto || msg.photo || msg.mediaType === 'photo';
             const isVideo = msg.hasVideo || msg.video || msg.mediaType === 'video' || msg.mediaType === 'gif';
             const isAudio = msg.hasAudio || msg.mediaType === 'audio';

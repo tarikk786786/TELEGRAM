@@ -1,9 +1,9 @@
-export default function GroupList({ groups, selectedGroup, onSelectGroup, onToggleMark, activeTab }) {
+export default function GroupList({ groups, selectedGroup, onSelectGroup }) {
   if (!groups.length) {
     return (
       <div className="group-list">
         <div className="no-messages">
-          <p>{activeTab === 'marked' ? 'No marked groups yet. Star a group to see it here.' : 'No groups found.'}</p>
+          <p>No groups found.</p>
         </div>
       </div>
     );
@@ -51,17 +51,6 @@ export default function GroupList({ groups, selectedGroup, onSelectGroup, onTogg
                 <span className={`badge ${isPublic ? 'public' : 'private'}`}>
                   {isPublic ? 'Public' : 'Private'}
                 </span>
-                <button
-                  className={`mark-button ${group.marked ? 'marked' : ''}`}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onToggleMark(group.id, !group.marked);
-                  }}
-                  title={group.marked ? 'Unmark group' : 'Mark group'}
-                  aria-label={group.marked ? 'Unmark group' : 'Mark group'}
-                >
-                  {group.marked ? '★' : '☆'}
-                </button>
               </div>
             </div>
 

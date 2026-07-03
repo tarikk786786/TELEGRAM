@@ -1,4 +1,4 @@
-export default function Header({ onOpenAdmin, onOpenSettings, onLogout }) {
+export default function Header({ onOpenAdmin }) {
   return (
     <div className="header">
       <div className="header-content">
@@ -30,43 +30,6 @@ export default function Header({ onOpenAdmin, onOpenSettings, onLogout }) {
               }}
             >
               🛡️ Admin
-            </button>
-          )}
-          {onOpenSettings && (
-            <button
-              onClick={onOpenSettings}
-              title="Settings & Options"
-              style={{
-                background: 'rgba(255, 255, 255, 0.08)',
-                border: '1px solid rgba(255, 255, 255, 0.12)',
-                color: '#fff',
-                borderRadius: '8px',
-                padding: '0.4rem 0.65rem',
-                fontSize: '0.8rem',
-                cursor: 'pointer',
-                transition: 'all 0.2s',
-              }}
-            >
-              ⚙️
-            </button>
-          )}
-          {onLogout && (
-            <button
-              onClick={onLogout}
-              title="Log Out"
-              style={{
-                background: 'rgba(255, 107, 107, 0.15)',
-                border: '1px solid rgba(255, 107, 107, 0.3)',
-                color: '#ff6b6b',
-                borderRadius: '8px',
-                padding: '0.4rem 0.65rem',
-                fontSize: '0.75rem',
-                fontWeight: 600,
-                cursor: 'pointer',
-                transition: 'all 0.2s',
-              }}
-            >
-              Log Out
             </button>
           )}
         </div>
