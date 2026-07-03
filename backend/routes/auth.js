@@ -22,14 +22,18 @@ router.get('/status', async (req, res) => {
   }
 });
 
-// ── POST /api/auth/send-code ────────────────────────────────
-// Send a login code to the user's phone number
 router.post('/send-code', async (req, res) => {
   try {
-    const { phoneNumber } = req.body;
+    let { phoneNumber } = req.body;
 
     if (!phoneNumber) {
       return res.status(400).json({ error: 'Phone number is required' });
+    }
+
+    // Clean and format phone number to international format
+    phoneNumber = phoneNumber.replace(/[\s\-\(\)]/g, '');
+    if (!phoneNumber.startsWith('+')) {
+      phoneNumber = '+' + phoneNumber;
     }
 
     // Make sure client is connected
@@ -51,12 +55,14 @@ router.post('/send-code', async (req, res) => {
     res.json({
       success: true,
       phoneCodeHash: result.phoneCodeHash,
+      phoneNumber,
     });
   } catch (err) {
-    console.error('❌ Send code failed:', err.message);
+    console.error('❌ Send code failed:', err);
+    const errorMsg = err.errorMessage || err.message || 'Failed to send code';
     res.status(500).json({
-      error: 'Failed to send code',
-      message: err.message,
+      error: errorMsg,
+      message: errorMsg,
     });
   }
 });
