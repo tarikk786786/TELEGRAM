@@ -270,7 +270,36 @@ export default function AdminPanel({ groups, onGroupUpdated, isOpen, onClose }) 
           ) : telegramStatus === 'checking' ? (
             <div style={{ marginBottom: '20px', color: '#8b949e' }}>Checking Telegram connection...</div>
           ) : (
-            <div style={{ marginBottom: '20px', color: '#2ea043', fontWeight: 600 }}>✅ Telegram Backend Connected</div>
+            <div style={{ marginBottom: '20px', background: 'rgba(46, 160, 67, 0.1)', padding: '15px', borderRadius: '8px', border: '1px solid rgba(46, 160, 67, 0.3)' }}>
+              <div style={{ color: '#2ea043', fontWeight: 600, marginBottom: '10px' }}>✅ Telegram Backend Connected</div>
+              <div style={{ fontSize: '0.85rem', color: '#8b949e', marginBottom: '10px' }}>
+                <strong>Important:</strong> Because free backend servers restart periodically, your login will be erased. To make this login <strong>PERMANENT</strong> so you never have to log in again:
+                <ol style={{ marginLeft: '20px', marginTop: '5px' }}>
+                  <li>Copy the Session Key below.</li>
+                  <li>Go to your Render Dashboard ➔ Environment Variables.</li>
+                  <li>Add a new variable named <strong>TELEGRAM_SESSION</strong> and paste the key.</li>
+                </ol>
+              </div>
+              <div style={{ display: 'flex', gap: '10px' }}>
+                <input 
+                  type="password" 
+                  className="search-input" 
+                  value={localStorage.getItem('telegram_session') || ''} 
+                  readOnly 
+                  style={{ flex: 1, fontFamily: 'monospace', fontSize: '0.8rem' }}
+                />
+                <button 
+                  type="button" 
+                  className="option-btn" 
+                  onClick={() => {
+                    navigator.clipboard.writeText(localStorage.getItem('telegram_session') || '');
+                    alert('Session Key Copied! Now add it to Render.');
+                  }}
+                >
+                  Copy Key
+                </button>
+              </div>
+            </div>
           )}
 
           <h3>📋 Manage Public Groups ({localGroups.length})</h3>

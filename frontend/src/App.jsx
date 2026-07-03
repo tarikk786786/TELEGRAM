@@ -78,9 +78,7 @@ export default function App() {
   }, [selectedGroup]);
 
   /* ── Filter groups ────────────────── */
-  const filteredGroups = groups.filter((g) => !!g);
-
-  /* ── Load more messages (pagination) ────────────────────── */
+  const filteredGroups = groups.filter((g) => !!g && g.isPublished !== false);
   const handleLoadMore = useCallback(async () => {
     if (!selectedGroup || messages.length === 0) return;
     const lastMsgId = messages[messages.length - 1]?.id;
