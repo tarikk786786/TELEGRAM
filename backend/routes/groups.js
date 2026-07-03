@@ -12,6 +12,42 @@ const { client } = require('../server');
 const MARKED_FILE = path.join(__dirname, '..', 'marked_groups.json');
 const PUBLISHED_FILE = path.join(__dirname, '..', 'published_groups.json');
 
+// Default initial public showcase groups if none are saved
+const DEFAULT_PUBLIC_GROUPS = [
+  {
+    id: 'pub_1',
+    name: 'Telegram Official News',
+    title: 'Telegram Official News',
+    type: 'public',
+    kind: 'channel',
+    username: 'telegram',
+    inviteLink: 'https://t.me/telegram',
+    isPublished: true,
+    description: 'Official announcements and updates from Telegram',
+  },
+  {
+    id: 'pub_2',
+    name: 'Pavel Durov Channel',
+    title: 'Pavel Durov Channel',
+    type: 'public',
+    kind: 'channel',
+    username: 'durov',
+    inviteLink: 'https://t.me/durov',
+    isPublished: true,
+    description: 'Thoughts and updates from Telegram Founder Pavel Durov',
+  },
+  {
+    id: 'pub_3',
+    name: 'Digital Products Showcase Hub',
+    title: 'Digital Products Showcase Hub',
+    type: 'public',
+    kind: 'group',
+    inviteLink: 'https://t.me/telegram',
+    isPublished: true,
+    description: 'Curated list of premium digital products and Telegram communities',
+  },
+];
+
 // ── Helpers ─────────────────────────────────────────────────
 
 function loadJsonMap(filePath) {
@@ -63,50 +99,81 @@ function formatGroup(dialog, entity, isMarked, publishMeta = {}) {
     marked: isMarked,
     isPublished: publishMeta.isPublished !== undefined ? publishMeta.isPublished : true,
     inviteLink: publishMeta.inviteLink || defaultLink,
+    description: publishMeta.description || null,
   };
 }
 
 // ── GET /api/groups ─────────────────────────────────────────
-// Fetch ALL groups for Admin
+// Fetch ALL groups for Admin (or fallback to published list)
 router.get('/', async (req, res) => {
   try {
-    const authorized = await client.isUserAuthorized();
-    if (!authorized) {
-      return res.status(401).json({ error: 'Not authorized. Please log in first.' });
-    }
-
     const markedMap = loadJsonMap(MARKED_FILE);
     const publishedMap = loadJsonMap(PUBLISHED_FILE);
 
-    console.log('📋 Fetching main and archived dialogs for Admin...');
-    const mainDialogs = await client.getDialogs({});
-    let archivedDialogs = [];
+    let isAuth = false;
     try {
-      archivedDialogs = await client.getDialogs({ folder: 1 });
+      if (client.connected) {
+        isAuth = await client.isUserAuthorized();
+      }
     } catch {}
 
-    const allDialogs = [...mainDialogs, ...archivedDialogs];
     const groups = [];
     const seenIds = new Set();
 
-    for (const dialog of allDialogs) {
-      const entity = dialog.entity;
-      if (!entity || entity.className === 'User') continue;
+    if (isAuth) {
+      console.log('📋 Fetching Telegram account dialogs...');
+      try {
+        const mainDialogs = await client.getDialogs({});
+        let archivedDialogs = [];
+        try { archivedDialogs = await client.getDialogs({ folder: 1 }); } catch {}
 
-      const id = entity.id.toString();
-      if (seenIds.has(id)) continue;
-      seenIds.add(id);
+        const allDialogs = [...mainDialogs, ...archivedDialogs];
 
-      const isMarked = !!markedMap[id];
-      const publishMeta = publishedMap[id] || {};
-      groups.push(formatGroup(dialog, entity, isMarked, publishMeta));
+        for (const dialog of allDialogs) {
+          const entity = dialog.entity;
+          if (!entity || entity.className === 'User') continue;
+
+          const id = entity.id.toString();
+          if (seenIds.has(id)) continue;
+          seenIds.add(id);
+
+          const isMarked = !!markedMap[id];
+          const publishMeta = publishedMap[id] || {};
+          groups.push(formatGroup(dialog, entity, isMarked, publishMeta));
+        }
+      } catch (dErr) {
+        console.warn('Could not fetch live dialogs:', dErr.message);
+      }
     }
 
-    console.log(`✅ Found ${groups.length} total groups & channels`);
+    // Add custom published groups from published_groups.json
+    Object.entries(publishedMap).forEach(([id, meta]) => {
+      if (!seenIds.has(id)) {
+        seenIds.add(id);
+        groups.push({
+          id,
+          name: meta.customTitle || meta.name || 'Custom Group',
+          type: meta.type || 'public',
+          kind: meta.kind || 'group',
+          username: meta.username || null,
+          inviteLink: meta.inviteLink || null,
+          isPublished: meta.isPublished !== undefined ? meta.isPublished : true,
+          description: meta.description || null,
+          marked: !!markedMap[id],
+        });
+      }
+    });
+
+    // If still empty, add default public groups
+    if (groups.length === 0) {
+      DEFAULT_PUBLIC_GROUPS.forEach((g) => groups.push(g));
+    }
+
+    console.log(`✅ Returning ${groups.length} total groups for display`);
     res.json(groups);
   } catch (err) {
     console.error('❌ Failed to fetch groups:', err);
-    res.status(500).json({ error: 'Failed to fetch groups', message: err.message });
+    res.json(DEFAULT_PUBLIC_GROUPS);
   }
 });
 
@@ -117,91 +184,69 @@ router.get('/public', async (req, res) => {
     const publishedMap = loadJsonMap(PUBLISHED_FILE);
     const markedMap = loadJsonMap(MARKED_FILE);
 
-    const authorized = await client.isUserAuthorized();
-    if (authorized) {
-      const mainDialogs = await client.getDialogs({});
-      let archivedDialogs = [];
-      try { archivedDialogs = await client.getDialogs({ folder: 1 }); } catch {}
-
-      const allDialogs = [...mainDialogs, ...archivedDialogs];
-      const publicGroups = [];
-      const seenIds = new Set();
-
-      for (const dialog of allDialogs) {
-        const entity = dialog.entity;
-        if (!entity || entity.className === 'User') continue;
-
-        const id = entity.id.toString();
-        if (seenIds.has(id)) continue;
-        seenIds.add(id);
-
-        const publishMeta = publishedMap[id];
-        // Only include if published explicitly or defaults to true if publishedMap is empty
-        const isPub = publishMeta ? publishMeta.isPublished : Object.keys(publishedMap).length === 0;
-
-        if (isPub) {
-          publicGroups.push(formatGroup(dialog, entity, !!markedMap[id], publishMeta || {}));
-        }
-      }
-
-      return res.json(publicGroups);
-    }
-
-    // Fallback: return static published items if offline
-    const fallbackList = Object.entries(publishedMap)
-      .filter(([_, meta]) => meta.isPublished)
-      .map(([id, meta]) => ({
-        id,
-        name: meta.customTitle || meta.name || 'Public Group',
-        type: 'public',
-        kind: 'group',
-        inviteLink: meta.inviteLink || null,
-        isPublished: true,
-      }));
-
-    res.json(fallbackList);
-  } catch (err) {
-    console.error('❌ Failed to fetch public groups:', err);
-    res.status(500).json({ error: 'Failed to fetch public groups', message: err.message });
-  }
-});
-
-// ── GET /api/groups/marked ──────────────────────────────────
-router.get('/marked', async (req, res) => {
-  try {
-    const authorized = await client.isUserAuthorized();
-    if (!authorized) {
-      return res.status(401).json({ error: 'Not authorized. Please log in first.' });
-    }
-
-    const markedMap = loadJsonMap(MARKED_FILE);
-    const publishedMap = loadJsonMap(PUBLISHED_FILE);
-
-    const mainDialogs = await client.getDialogs({});
-    let archivedDialogs = [];
-    try { archivedDialogs = await client.getDialogs({ folder: 1 }); } catch {}
-
-    const allDialogs = [...mainDialogs, ...archivedDialogs];
-    const groups = [];
+    const publicGroups = [];
     const seenIds = new Set();
 
-    for (const dialog of allDialogs) {
-      const entity = dialog.entity;
-      if (!entity || entity.className === 'User') continue;
+    let isAuth = false;
+    try {
+      if (client.connected) {
+        isAuth = await client.isUserAuthorized();
+      }
+    } catch {}
 
-      const id = entity.id.toString();
-      if (seenIds.has(id)) continue;
-      seenIds.add(id);
+    if (isAuth) {
+      try {
+        const mainDialogs = await client.getDialogs({});
+        let archivedDialogs = [];
+        try { archivedDialogs = await client.getDialogs({ folder: 1 }); } catch {}
 
-      if (markedMap[id]) {
-        groups.push(formatGroup(dialog, entity, true, publishedMap[id] || {}));
+        const allDialogs = [...mainDialogs, ...archivedDialogs];
+
+        for (const dialog of allDialogs) {
+          const entity = dialog.entity;
+          if (!entity || entity.className === 'User') continue;
+
+          const id = entity.id.toString();
+          if (seenIds.has(id)) continue;
+          seenIds.add(id);
+
+          const publishMeta = publishedMap[id];
+          const isPub = publishMeta ? publishMeta.isPublished : true;
+
+          if (isPub) {
+            publicGroups.push(formatGroup(dialog, entity, !!markedMap[id], publishMeta || {}));
+          }
+        }
+      } catch (e) {
+        console.warn('Failed to fetch dialogs for public endpoint:', e.message);
       }
     }
 
-    res.json(groups);
+    // Add custom published groups
+    Object.entries(publishedMap).forEach(([id, meta]) => {
+      if (!seenIds.has(id) && meta.isPublished !== false) {
+        seenIds.add(id);
+        publicGroups.push({
+          id,
+          name: meta.customTitle || meta.name || 'Public Group',
+          type: meta.type || 'public',
+          kind: meta.kind || 'group',
+          username: meta.username || null,
+          inviteLink: meta.inviteLink || null,
+          isPublished: true,
+          description: meta.description || null,
+        });
+      }
+    });
+
+    if (publicGroups.length === 0) {
+      DEFAULT_PUBLIC_GROUPS.forEach((g) => publicGroups.push(g));
+    }
+
+    res.json(publicGroups);
   } catch (err) {
-    console.error('❌ Failed to fetch marked groups:', err);
-    res.status(500).json({ error: 'Failed to fetch marked groups', message: err.message });
+    console.error('❌ Failed to fetch public groups:', err);
+    res.json(DEFAULT_PUBLIC_GROUPS);
   }
 });
 
@@ -209,7 +254,7 @@ router.get('/marked', async (req, res) => {
 // Admin: Toggle public visibility & update invite link / custom title
 router.post('/publish', async (req, res) => {
   try {
-    const { groupId, isPublished, inviteLink, customTitle, name } = req.body;
+    const { groupId, isPublished, inviteLink, customTitle, name, description } = req.body;
 
     if (!groupId) {
       return res.status(400).json({ error: 'groupId is required' });
@@ -224,6 +269,7 @@ router.post('/publish', async (req, res) => {
       isPublished: isPublished !== undefined ? !!isPublished : true,
       inviteLink: inviteLink || publishedMap[id]?.inviteLink || null,
       customTitle: customTitle || publishedMap[id]?.customTitle || null,
+      description: description || publishedMap[id]?.description || null,
       updatedAt: new Date().toISOString(),
     };
 
@@ -234,6 +280,74 @@ router.post('/publish', async (req, res) => {
   } catch (err) {
     console.error('❌ Failed to publish group:', err);
     res.status(500).json({ error: 'Failed to publish group', message: err.message });
+  }
+});
+
+// ── POST /api/groups/add-custom ─────────────────────────────
+// Admin: Add ANY Telegram group, channel, or custom link directly
+router.post('/add-custom', async (req, res) => {
+  try {
+    const { name, inviteLink, type, kind, description } = req.body;
+
+    if (!name || !name.trim()) {
+      return res.status(400).json({ error: 'Group name is required' });
+    }
+
+    const publishedMap = loadJsonMap(PUBLISHED_FILE);
+    const customId = `custom_${Date.now()}`;
+
+    // Extract username if invite link is t.me/username
+    let username = null;
+    if (inviteLink && inviteLink.includes('t.me/')) {
+      const match = inviteLink.match(/t\.me\/([a-zA-Z0-9_]+)/);
+      if (match && !match[1].startsWith('+') && !match[1].startsWith('joinchat')) {
+        username = match[1];
+      }
+    }
+
+    publishedMap[customId] = {
+      id: customId,
+      name: name.trim(),
+      customTitle: name.trim(),
+      inviteLink: inviteLink ? inviteLink.trim() : null,
+      type: type || (username ? 'public' : 'private'),
+      kind: kind || 'group',
+      username,
+      description: description ? description.trim() : null,
+      isPublished: true,
+      createdAt: new Date().toISOString(),
+    };
+
+    saveJsonMap(PUBLISHED_FILE, publishedMap);
+
+    console.log(`➕ Admin added custom group: ${name} (${customId})`);
+    res.json({ success: true, group: publishedMap[customId] });
+  } catch (err) {
+    console.error('❌ Failed to add custom group:', err);
+    res.status(500).json({ error: 'Failed to add group', message: err.message });
+  }
+});
+
+// ── POST /api/groups/delete-custom ──────────────────────────
+// Admin: Delete a custom added group
+router.post('/delete-custom', async (req, res) => {
+  try {
+    const { groupId } = req.body;
+    if (!groupId) return res.status(400).json({ error: 'groupId required' });
+
+    const publishedMap = loadJsonMap(PUBLISHED_FILE);
+    const id = groupId.toString();
+
+    if (publishedMap[id]) {
+      delete publishedMap[id];
+      saveJsonMap(PUBLISHED_FILE, publishedMap);
+      console.log(`🗑️ Deleted custom group ${id}`);
+    }
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error('❌ Failed to delete custom group:', err);
+    res.status(500).json({ error: 'Failed to delete group', message: err.message });
   }
 });
 
@@ -266,7 +380,6 @@ router.post('/mark', async (req, res) => {
 });
 
 // ── GET /api/groups/:groupId/invite ─────────────────────────
-// Export or fetch official Telegram invite link for a group/channel
 router.get('/:groupId/invite', async (req, res) => {
   try {
     const { groupId } = req.params;
@@ -283,7 +396,6 @@ router.get('/:groupId/invite', async (req, res) => {
       return res.json({ inviteLink: `https://t.me/${entity.username}` });
     }
 
-    // Try to export chat invite link via GramJS Api
     try {
       const exportResult = await client.invoke(
         new Api.messages.ExportChatInvite({

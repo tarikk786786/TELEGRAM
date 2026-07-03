@@ -124,13 +124,33 @@ export async function toggleMarkGroup(groupId, marked) {
   return await res.json();
 }
 
-export async function publishGroup(groupId, isPublished, inviteLink = null, customTitle = null, name = null) {
+export async function publishGroup(groupId, isPublished, inviteLink = null, customTitle = null, name = null, description = null) {
   const res = await fetch(`${API_BASE}/api/groups/publish`, {
     method: 'POST',
     headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
-    body: JSON.stringify({ groupId, isPublished, inviteLink, customTitle, name }),
+    body: JSON.stringify({ groupId, isPublished, inviteLink, customTitle, name, description }),
   });
   if (!res.ok) throw new Error(`Failed to publish group (${res.status})`);
+  return await res.json();
+}
+
+export async function addCustomGroup(name, inviteLink, type = 'public', kind = 'group', description = '') {
+  const res = await fetch(`${API_BASE}/api/groups/add-custom`, {
+    method: 'POST',
+    headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({ name, inviteLink, type, kind, description }),
+  });
+  if (!res.ok) throw new Error(`Failed to add custom group (${res.status})`);
+  return await res.json();
+}
+
+export async function deleteCustomGroup(groupId) {
+  const res = await fetch(`${API_BASE}/api/groups/delete-custom`, {
+    method: 'POST',
+    headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({ groupId }),
+  });
+  if (!res.ok) throw new Error(`Failed to delete custom group (${res.status})`);
   return await res.json();
 }
 

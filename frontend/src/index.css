@@ -607,6 +607,82 @@ body {
   overflow-y: auto;
 }
 
+/* Add Group Form */
+.add-group-form {
+  background: #0f172a;
+  border: 1px solid rgba(56, 189, 248, 0.3);
+  border-radius: var(--radius-md);
+  padding: 16px 20px;
+  margin-bottom: 20px;
+}
+
+.add-group-form h3 {
+  font-size: 1.05rem;
+  color: #38bdf8;
+  margin-bottom: 12px;
+}
+
+.add-msg {
+  background: rgba(56, 189, 248, 0.15);
+  color: #38bdf8;
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  margin-bottom: 12px;
+}
+
+.form-row {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.form-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.flex-1 { flex: 1; }
+.flex-2 { flex: 2; }
+.flex-3 { flex: 3; }
+
+.form-field label {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #cbd5e1;
+}
+
+.full-width {
+  width: 100%;
+}
+
+.admin-divider {
+  border: 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  margin: 18px 0;
+}
+
+.kind-badge {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  background: rgba(255, 255, 255, 0.1);
+  color: #94a3b8;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-weight: 700;
+}
+
+.option-btn.danger {
+  background: rgba(255, 107, 107, 0.15);
+  border: 1px solid rgba(255, 107, 107, 0.3);
+  color: #ff6b6b;
+}
+
+.option-btn.danger:hover {
+  background: rgba(255, 107, 107, 0.3);
+}
+
 .admin-group-list {
   display: flex;
   flex-direction: column;
