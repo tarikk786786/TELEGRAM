@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { publishGroup, fetchGroupInviteLink, addCustomGroup, deleteCustomGroup, adminLogin } from '../api';
+import { publishGroup, fetchGroupInviteLink, addCustomGroup, deleteCustomGroup, adminLogin, checkAuthStatus, sendCode, verifyCode, verify2FA } from '../api';
 
 export default function AdminPanel({ groups, onGroupUpdated, isOpen, onClose }) {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -13,6 +13,15 @@ export default function AdminPanel({ groups, onGroupUpdated, isOpen, onClose }) 
   const [savingId, setSavingId] = useState(null);
   const [copiedId, setCopiedId] = useState(null);
 
+  // Telegram Auth State
+  const [telegramStatus, setTelegramStatus] = useState('checking'); // checking, unauthorized, authorized
+  const [phoneNumber, setPhoneNumber] = useState('');
+  const [phoneCode, setPhoneCode] = useState('');
+  const [phoneCodeHash, setPhoneCodeHash] = useState('');
+  const [twoFAPassword, setTwoFAPassword] = useState('');
+  const [authStep, setAuthStep] = useState('phone'); // phone, code, 2fa
+  const [tgAuthError, setTgAuthError] = useState('');
+
   useEffect(() => {
     setLocalGroups(groups || []);
   }, [groups]);
@@ -23,6 +32,16 @@ export default function AdminPanel({ groups, onGroupUpdated, isOpen, onClose }) 
       setIsAuthenticated(true);
     }
   }, []);
+
+  useEffect(() => {
+    if (isAuthenticated && isOpen) {
+      checkAuthStatus().then(data => {
+        setTelegramStatus(data.authorized ? 'authorized' : 'unauthorized');
+      }).catch(err => {
+        setTelegramStatus('unauthorized');
+      });
+    }
+  }, [isAuthenticated, isOpen]);
 
   if (!isOpen) return null;
 
@@ -37,6 +56,46 @@ export default function AdminPanel({ groups, onGroupUpdated, isOpen, onClose }) 
       }
     } catch (err) {
       setAuthError('Invalid password. Please try again.');
+    }
+  };
+
+  const handleSendCode = async (e) => {
+    e.preventDefault();
+    setTgAuthError('');
+    try {
+      const res = await sendCode(phoneNumber);
+      setPhoneCodeHash(res.phoneCodeHash);
+      setAuthStep('code');
+    } catch (err) {
+      setTgAuthError(err.message);
+    }
+  };
+
+  const handleVerifyCode = async (e) => {
+    e.preventDefault();
+    setTgAuthError('');
+    try {
+      const res = await verifyCode(phoneNumber, phoneCode, phoneCodeHash);
+      if (res.requires2FA) {
+        setAuthStep('2fa');
+      } else {
+        setTelegramStatus('authorized');
+        if (onGroupUpdated) onGroupUpdated();
+      }
+    } catch (err) {
+      setTgAuthError(err.message);
+    }
+  };
+
+  const handleVerify2FA = async (e) => {
+    e.preventDefault();
+    setTgAuthError('');
+    try {
+      await verify2FA(twoFAPassword);
+      setTelegramStatus('authorized');
+      if (onGroupUpdated) onGroupUpdated();
+    } catch (err) {
+      setTgAuthError(err.message);
     }
   };
 
@@ -181,6 +240,39 @@ export default function AdminPanel({ groups, onGroupUpdated, isOpen, onClose }) 
         </div>
 
         <div className="modal-body admin-body">
+          {telegramStatus === 'unauthorized' ? (
+            <div className="telegram-login-section" style={{ background: 'rgba(255,255,255,0.05)', padding: '15px', borderRadius: '8px', marginBottom: '20px' }}>
+              <h3>🔌 Connect Telegram Account</h3>
+              <p style={{ color: '#8b949e', fontSize: '0.9rem', marginBottom: '15px' }}>
+                Your backend needs to be connected to your Telegram account to fetch groups. This is only visible to you.
+              </p>
+              {tgAuthError && <div style={{ color: '#ff4d4f', marginBottom: '10px' }}>{tgAuthError}</div>}
+              
+              {authStep === 'phone' && (
+                <form onSubmit={handleSendCode} style={{ display: 'flex', gap: '10px' }}>
+                  <input type="text" className="search-input" placeholder="Phone Number (e.g. +123456789)" value={phoneNumber} onChange={e => setPhoneNumber(e.target.value)} required />
+                  <button type="submit" className="option-btn primary">Send Code</button>
+                </form>
+              )}
+              {authStep === 'code' && (
+                <form onSubmit={handleVerifyCode} style={{ display: 'flex', gap: '10px' }}>
+                  <input type="text" className="search-input" placeholder="Login Code from Telegram" value={phoneCode} onChange={e => setPhoneCode(e.target.value)} required />
+                  <button type="submit" className="option-btn primary">Verify</button>
+                </form>
+              )}
+              {authStep === '2fa' && (
+                <form onSubmit={handleVerify2FA} style={{ display: 'flex', gap: '10px' }}>
+                  <input type="password" className="search-input" placeholder="2FA Password" value={twoFAPassword} onChange={e => setTwoFAPassword(e.target.value)} required />
+                  <button type="submit" className="option-btn primary">Submit 2FA</button>
+                </form>
+              )}
+            </div>
+          ) : telegramStatus === 'checking' ? (
+            <div style={{ marginBottom: '20px', color: '#8b949e' }}>Checking Telegram connection...</div>
+          ) : (
+            <div style={{ marginBottom: '20px', color: '#2ea043', fontWeight: 600 }}>✅ Telegram Backend Connected</div>
+          )}
+
           <h3>📋 Manage Public Groups ({localGroups.length})</h3>
 
           <div className="admin-group-list">
