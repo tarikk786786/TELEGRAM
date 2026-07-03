@@ -13,8 +13,8 @@ const { TelegramClient } = require('telegram');
 const { StringSession } = require('telegram/sessions');
 
 // ── Config ──────────────────────────────────────────────────
-const API_ID = parseInt(process.env.API_ID);
-const API_HASH = process.env.API_HASH;
+const API_ID = parseInt(process.env.API_ID || '28029012', 10);
+const API_HASH = process.env.API_HASH || '668ab53e0d7e7e8e1b13420fa80e1cbb';
 const PORT = process.env.PORT || 3001;
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
 const SESSION_FILE = path.join(__dirname, 'session.txt');
