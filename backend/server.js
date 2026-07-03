@@ -20,11 +20,13 @@ const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
 const SESSION_FILE = path.join(__dirname, 'session.txt');
 
 // ── Load saved session ──────────────────────────────────────
-let savedSession = '';
+let savedSession = process.env.TELEGRAM_SESSION || '';
 try {
-  if (fs.existsSync(SESSION_FILE)) {
+  if (!savedSession && fs.existsSync(SESSION_FILE)) {
     savedSession = fs.readFileSync(SESSION_FILE, 'utf-8').trim();
     console.log('📂 Loaded saved session from session.txt');
+  } else if (savedSession) {
+    console.log('🔑 Loaded saved session from TELEGRAM_SESSION env variable');
   }
 } catch (err) {
   console.warn('⚠️  Could not load session file:', err.message);

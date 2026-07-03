@@ -1,14 +1,10 @@
 import { useState, useEffect, useCallback } from 'react';
-import { checkAuthStatus, fetchGroups, fetchMarkedGroups, fetchMessages, toggleMarkGroup, logout } from './api';
+import { fetchGroups, fetchMarkedGroups, fetchMessages, toggleMarkGroup } from './api';
 import Header from './components/Header';
 import GroupList from './components/GroupList';
 import MessageFeed from './components/MessageFeed';
-import LoginPage from './components/LoginPage';
 
 export default function App() {
-  /* ── Auth state ──────────────────────────────────────────── */
-  const [authStatus, setAuthStatus] = useState('checking'); // 'checking' | 'unauthorized' | 'authorized'
-
   /* ── Dashboard state ─────────────────────────────────────── */
   const [groups, setGroups] = useState([]);
   const [selectedGroup, setSelectedGroup] = useState(null);
@@ -20,26 +16,8 @@ export default function App() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('all'); // 'all' | 'marked'
 
-  /* ── Check auth on mount ─────────────────────────────────── */
+  /* ── Load groups directly on mount or tab change ─────────── */
   useEffect(() => {
-    let cancelled = false;
-    async function check() {
-      try {
-        const data = await checkAuthStatus();
-        if (!cancelled) {
-          setAuthStatus(data.authorized ? 'authorized' : 'unauthorized');
-        }
-      } catch {
-        if (!cancelled) setAuthStatus('unauthorized');
-      }
-    }
-    check();
-    return () => { cancelled = true; };
-  }, []);
-
-  /* ── Load groups when authorized or tab changes ──────────── */
-  useEffect(() => {
-    if (authStatus !== 'authorized') return;
     let cancelled = false;
 
     async function load() {
@@ -48,9 +26,18 @@ export default function App() {
         setError(null);
         const data = activeTab === 'marked' ? await fetchMarkedGroups() : await fetchGroups();
         const list = Array.isArray(data) ? data : (data?.groups || []);
-        if (!cancelled) setGroups(list);
+        if (!cancelled) {
+          setGroups(list);
+          // Auto-select first group if none selected
+          if (list.length > 0 && !selectedGroup) {
+            setSelectedGroup(list[0]);
+          }
+        }
       } catch (err) {
-        if (!cancelled) setError(err.message);
+        if (!cancelled) {
+          console.error('Failed to load groups:', err);
+          setError(err.message || 'Failed to load groups from backend');
+        }
       } finally {
         if (!cancelled) setLoadingGroups(false);
       }
@@ -58,65 +45,78 @@ export default function App() {
 
     load();
     return () => { cancelled = true; };
-  }, [authStatus, activeTab]);
+  }, [activeTab]);
 
-  /* ── Load messages when a group is selected ─────────────── */
+  /* ── Load messages when selected group changes ──────────── */
   useEffect(() => {
-    if (!selectedGroup) return;
+    if (!selectedGroup) {
+      setMessages([]);
+      return;
+    }
     let cancelled = false;
 
-    async function load() {
+    async function loadMsg() {
       try {
         setLoadingMessages(true);
         setError(null);
-        const data = await fetchMessages(selectedGroup.id, 50);
+        const data = await fetchMessages(selectedGroup.id, 50, 0);
         if (!cancelled) {
-          setMessages(data.messages || data);
-          setHasMore(data.hasMore || false);
+          setMessages(data.messages || []);
+          setHasMore(!!data.hasMore);
         }
       } catch (err) {
-        if (!cancelled) setError(err.message);
+        if (!cancelled) {
+          console.error('Failed to load messages:', err);
+          setError(err.message || 'Failed to load messages');
+        }
       } finally {
         if (!cancelled) setLoadingMessages(false);
       }
     }
 
-    load();
+    loadMsg();
     return () => { cancelled = true; };
   }, [selectedGroup]);
 
-  /* ── Load more messages ─────────────────────────────────── */
+  /* ── Load more messages (pagination) ────────────────────── */
   const handleLoadMore = useCallback(async () => {
     if (!selectedGroup || messages.length === 0) return;
+    const lastMsgId = messages[messages.length - 1]?.id;
+    if (!lastMsgId) return;
+
     try {
-      const oldestId = messages[0]?.id || 0;
-      const data = await fetchMessages(selectedGroup.id, 50, oldestId);
-      const newMsgs = data.messages || data;
-      setMessages((prev) => [...newMsgs, ...prev]);
-      setHasMore(data.hasMore || false);
+      const data = await fetchMessages(selectedGroup.id, 50, lastMsgId);
+      const newMsgs = data.messages || [];
+      setMessages((prev) => [...prev, ...newMsgs]);
+      setHasMore(!!data.hasMore);
     } catch (err) {
-      setError(err.message);
+      console.error('Failed to load more messages:', err);
     }
   }, [selectedGroup, messages]);
 
-  /* ── Select group ───────────────────────────────────────── */
-  const handleSelectGroup = useCallback((group) => {
-    setSelectedGroup(group);
-    setMessages([]);
-    setHasMore(false);
-    setSidebarOpen(false);
+  /* ── Toggle mark (star) group ────────────────────────────── */
+  const handleToggleMark = useCallback(async (groupId, currentMarked) => {
+    const nextMarked = !currentMarked;
+    // Optimistic UI update
+    setGroups((prev) =>
+      prev.map((g) => (g.id === groupId ? { ...g, marked: nextMarked } : g))
+    );
+
+    try {
+      await toggleMarkGroup(groupId, nextMarked);
+    } catch (err) {
+      // Revert on error
+      setGroups((prev) =>
+        prev.map((g) => (g.id === groupId ? { ...g, marked: currentMarked } : g))
+      );
+      console.error('Failed to toggle mark:', err);
+    }
   }, []);
 
-  /* ── Toggle mark ────────────────────────────────────────── */
-  const handleToggleMark = useCallback(async (groupId, marked) => {
-    try {
-      await toggleMarkGroup(groupId, marked);
-      setGroups((prev) =>
-        prev.map((g) => (g.id === groupId ? { ...g, marked } : g))
-      );
-    } catch (err) {
-      setError(err.message);
-    }
+  /* ── Select group & close mobile sidebar ─────────────────── */
+  const handleSelectGroup = useCallback((group) => {
+    setSelectedGroup(group);
+    setSidebarOpen(false);
   }, []);
 
   /* ── Retry ──────────────────────────────────────────────── */
@@ -128,38 +128,13 @@ export default function App() {
       setLoadingGroups(true);
       const loadFn = activeTab === 'marked' ? fetchMarkedGroups : fetchGroups;
       loadFn()
-        .then(setGroups)
+        .then((data) => setGroups(Array.isArray(data) ? data : (data?.groups || [])))
         .catch((err) => setError(err.message))
         .finally(() => setLoadingGroups(false));
     }
   }, [selectedGroup, activeTab]);
 
-  /* ── Logout ─────────────────────────────────────────────── */
-  const handleLogout = useCallback(async () => {
-    await logout();
-    setAuthStatus('unauthorized');
-    setSelectedGroup(null);
-    setGroups([]);
-    setMessages([]);
-  }, []);
-
-  /* ── Auth checking / unauthorized → Login ────────────────── */
-  if (authStatus === 'checking') {
-    return (
-      <div className="login-page">
-        <div className="loading">
-          <div className="loading-spinner" />
-          <span className="loading-text">Connecting…</span>
-        </div>
-      </div>
-    );
-  }
-
-  if (authStatus === 'unauthorized') {
-    return <LoginPage onLoginSuccess={() => setAuthStatus('authorized')} />;
-  }
-
-  /* ── Authorized → Dashboard ─────────────────────────────── */
+  /* ── Render Dashboard ───────────────────────────────────── */
   return (
     <div className="app">
       {/* Mobile menu button */}
@@ -179,7 +154,7 @@ export default function App() {
 
       {/* Sidebar */}
       <aside className={`sidebar ${sidebarOpen ? 'open' : ''}`}>
-        <Header onLogout={handleLogout} />
+        <Header />
 
         {/* Tab bar */}
         <div className="tab-bar">
@@ -197,62 +172,33 @@ export default function App() {
           </button>
         </div>
 
-        {loadingGroups ? (
-          <div className="loading">
-            <div className="loading-spinner" />
-            <span className="loading-text">Loading groups…</span>
-          </div>
-        ) : error && !selectedGroup ? (
-          <div className="error-state">
-            <div className="error-state-icon">⚠️</div>
-            <h3>Something went wrong</h3>
-            <p>{error}</p>
-            <button className="retry-button" onClick={handleRetry}>
-              Try Again
-            </button>
-          </div>
-        ) : (
-          <GroupList
-            groups={groups}
-            selectedGroup={selectedGroup}
-            onSelectGroup={handleSelectGroup}
-            onToggleMark={handleToggleMark}
-            activeTab={activeTab}
-          />
-        )}
+        <GroupList
+          groups={groups}
+          selectedGroup={selectedGroup}
+          onSelectGroup={handleSelectGroup}
+          onToggleMark={handleToggleMark}
+          activeTab={activeTab}
+          loading={loadingGroups}
+        />
       </aside>
 
-      {/* Main content */}
+      {/* Main Content Area */}
       <main className="main-content">
-        {error && selectedGroup ? (
-          <div className="error-state">
-            <div className="error-state-icon">⚠️</div>
-            <h3>Couldn't load messages</h3>
-            <p>{error}</p>
-            <button className="retry-button" onClick={handleRetry}>
-              Try Again
-            </button>
-          </div>
-        ) : selectedGroup ? (
-          <MessageFeed
-            messages={messages}
-            groupName={selectedGroup.title || selectedGroup.name}
-            loading={loadingMessages}
-            chatId={selectedGroup.id}
-            onLoadMore={handleLoadMore}
-            hasMore={hasMore}
-          />
-        ) : (
-          <div className="empty-state">
-            <div className="empty-state-icon">
-              <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                <path d="M20.665 3.717l-17.73 6.837c-1.21.486-1.203 1.161-.222 1.462l4.552 1.42 10.532-6.645c.498-.303.953-.14.579.192l-8.533 7.701h-.002l.002.001-.314 4.692c.46 0 .663-.211.921-.46l2.211-2.15 4.599 3.397c.848.467 1.457.227 1.668-.785l3.019-14.228c.309-1.239-.473-1.8-1.282-1.434z"/>
-              </svg>
-            </div>
-            <h3>Welcome to Telegram Hub</h3>
-            <p>Select a group from the sidebar to browse messages and media content.</p>
+        {error && (
+          <div className="error-banner">
+            <span>⚠️ {error}</span>
+            <button onClick={handleRetry}>Retry</button>
           </div>
         )}
+
+        <MessageFeed
+          messages={messages}
+          groupName={selectedGroup ? selectedGroup.name : ''}
+          chatId={selectedGroup ? selectedGroup.id : ''}
+          loading={loadingMessages}
+          onLoadMore={handleLoadMore}
+          hasMore={hasMore}
+        />
       </main>
     </div>
   );
