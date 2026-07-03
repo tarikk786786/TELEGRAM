@@ -1,4 +1,4 @@
-export default function Header({ onLogout }) {
+export default function Header({ onOpenSettings, onLogout }) {
   return (
     <div className="header">
       <div className="header-content">
@@ -12,25 +12,45 @@ export default function Header({ onLogout }) {
           <h1>Telegram Hub</h1>
           <p>All your groups in one place</p>
         </div>
-        {onLogout && (
-          <button
-            onClick={onLogout}
-            title="Log Out"
-            style={{
-              background: 'rgba(255, 107, 107, 0.15)',
-              border: '1px solid rgba(255, 107, 107, 0.3)',
-              color: '#ff6b6b',
-              borderRadius: '8px',
-              padding: '0.4rem 0.75rem',
-              fontSize: '0.75rem',
-              fontWeight: 600,
-              cursor: 'pointer',
-              transition: 'all 0.2s',
-            }}
-          >
-            Log Out
-          </button>
-        )}
+        <div style={{ display: 'flex', gap: '6px' }}>
+          {onOpenSettings && (
+            <button
+              onClick={onOpenSettings}
+              title="Settings & Options"
+              style={{
+                background: 'rgba(255, 255, 255, 0.08)',
+                border: '1px solid rgba(255, 255, 255, 0.12)',
+                color: '#fff',
+                borderRadius: '8px',
+                padding: '0.4rem 0.65rem',
+                fontSize: '0.8rem',
+                cursor: 'pointer',
+                transition: 'all 0.2s',
+              }}
+            >
+              ⚙️
+            </button>
+          )}
+          {onLogout && (
+            <button
+              onClick={onLogout}
+              title="Log Out"
+              style={{
+                background: 'rgba(255, 107, 107, 0.15)',
+                border: '1px solid rgba(255, 107, 107, 0.3)',
+                color: '#ff6b6b',
+                borderRadius: '8px',
+                padding: '0.4rem 0.65rem',
+                fontSize: '0.75rem',
+                fontWeight: 600,
+                cursor: 'pointer',
+                transition: 'all 0.2s',
+              }}
+            >
+              Log Out
+            </button>
+          )}
+        </div>
       </div>
       <div className="header-separator" />
     </div>

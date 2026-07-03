@@ -1,12 +1,13 @@
 import { useState, useEffect, useCallback } from 'react';
-import { fetchGroups, fetchMarkedGroups, fetchMessages, toggleMarkGroup } from './api';
+import { fetchGroups, fetchMarkedGroups, fetchMessages, toggleMarkGroup, logout } from './api';
 import Header from './components/Header';
 import GroupList from './components/GroupList';
 import MessageFeed from './components/MessageFeed';
 import LoginPage from './components/LoginPage';
+import SettingsModal from './components/SettingsModal';
 
 export default function App() {
-  /* ── Dashboard state ─────────────────────────────────────── */
+  /* ── State ───────────────────────────────────────────────── */
   const [isUnauthorized, setIsUnauthorized] = useState(false);
   const [groups, setGroups] = useState([]);
   const [selectedGroup, setSelectedGroup] = useState(null);
@@ -16,7 +17,9 @@ export default function App() {
   const [loadingMessages, setLoadingMessages] = useState(false);
   const [error, setError] = useState(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState('all'); // 'all' | 'marked'
+  const [activeTab, setActiveTab] = useState('all'); // 'all' | 'groups' | 'channels' | 'marked'
+  const [searchQuery, setSearchQuery] = useState('');
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   /* ── Load groups directly on mount or tab change ─────────── */
   const loadGroupsList = useCallback(async () => {
@@ -81,6 +84,20 @@ export default function App() {
     return () => { cancelled = true; };
   }, [selectedGroup]);
 
+  /* ── Filter groups by tab & search query ────────────────── */
+  const filteredGroups = groups.filter((g) => {
+    const nameMatches =
+      (g.name || g.title || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (g.username || '').toLowerCase().includes(searchQuery.toLowerCase());
+
+    if (!nameMatches) return false;
+
+    if (activeTab === 'groups') return g.kind === 'group' || g.type === 'private';
+    if (activeTab === 'channels') return g.kind === 'channel' || g.type === 'public';
+    if (activeTab === 'marked') return !!g.marked;
+    return true;
+  });
+
   /* ── Load more messages (pagination) ────────────────────── */
   const handleLoadMore = useCallback(async () => {
     if (!selectedGroup || messages.length === 0) return;
@@ -100,7 +117,6 @@ export default function App() {
   /* ── Toggle mark (star) group ────────────────────────────── */
   const handleToggleMark = useCallback(async (groupId, currentMarked) => {
     const nextMarked = !currentMarked;
-    // Optimistic UI update
     setGroups((prev) =>
       prev.map((g) => (g.id === groupId ? { ...g, marked: nextMarked } : g))
     );
@@ -108,7 +124,6 @@ export default function App() {
     try {
       await toggleMarkGroup(groupId, nextMarked);
     } catch (err) {
-      // Revert on error
       setGroups((prev) =>
         prev.map((g) => (g.id === groupId ? { ...g, marked: currentMarked } : g))
       );
@@ -120,6 +135,15 @@ export default function App() {
   const handleSelectGroup = useCallback((group) => {
     setSelectedGroup(group);
     setSidebarOpen(false);
+  }, []);
+
+  /* ── Logout Handler ─────────────────────────────────────── */
+  const handleLogout = useCallback(async () => {
+    await logout();
+    setIsUnauthorized(true);
+    setGroups([]);
+    setMessages([]);
+    setSelectedGroup(null);
   }, []);
 
   /* ── Handle Login Success ────────────────────────────────── */
@@ -136,6 +160,13 @@ export default function App() {
   /* ── Render Dashboard ───────────────────────────────────── */
   return (
     <div className="app">
+      {/* Settings Modal */}
+      <SettingsModal
+        isOpen={settingsOpen}
+        onClose={() => setSettingsOpen(false)}
+        onLogout={handleLogout}
+      />
+
       {/* Mobile menu button */}
       <button
         className="mobile-menu-btn"
@@ -153,26 +184,52 @@ export default function App() {
 
       {/* Sidebar */}
       <aside className={`sidebar ${sidebarOpen ? 'open' : ''}`}>
-        <Header />
+        <Header
+          onOpenSettings={() => setSettingsOpen(true)}
+          onLogout={handleLogout}
+        />
 
-        {/* Tab bar */}
+        {/* Live Search Box */}
+        <div className="search-box-container">
+          <input
+            type="text"
+            className="search-input"
+            placeholder="🔍 Search groups & channels..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+          />
+        </div>
+
+        {/* Category Tab options */}
         <div className="tab-bar">
           <button
             className={`tab-button ${activeTab === 'all' ? 'active' : ''}`}
             onClick={() => setActiveTab('all')}
           >
-            All Groups
+            All
+          </button>
+          <button
+            className={`tab-button ${activeTab === 'groups' ? 'active' : ''}`}
+            onClick={() => setActiveTab('groups')}
+          >
+            Groups
+          </button>
+          <button
+            className={`tab-button ${activeTab === 'channels' ? 'active' : ''}`}
+            onClick={() => setActiveTab('channels')}
+          >
+            Channels
           </button>
           <button
             className={`tab-button ${activeTab === 'marked' ? 'active' : ''}`}
             onClick={() => setActiveTab('marked')}
           >
-            ★ Marked
+            ★ Starred
           </button>
         </div>
 
         <GroupList
-          groups={groups}
+          groups={filteredGroups}
           selectedGroup={selectedGroup}
           onSelectGroup={handleSelectGroup}
           onToggleMark={handleToggleMark}
@@ -194,6 +251,7 @@ export default function App() {
           messages={messages}
           groupName={selectedGroup ? selectedGroup.name : ''}
           chatId={selectedGroup ? selectedGroup.id : ''}
+          groupInfo={selectedGroup}
           loading={loadingMessages}
           onLoadMore={handleLoadMore}
           hasMore={hasMore}
