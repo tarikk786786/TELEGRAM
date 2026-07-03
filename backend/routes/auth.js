@@ -205,26 +205,19 @@ router.post('/verify-2fa', async (req, res) => {
     console.log('🔑 Verifying 2FA password...');
 
     try {
-      const passwordInfo = await client.invoke(new Api.account.GetPassword());
-      const passwordSrp = await client.computeSrpParams(passwordInfo, password);
-      await client.invoke(new Api.auth.CheckPassword({ password: passwordSrp }));
-    } catch (checkErr) {
-      console.warn('SRP CheckPassword failed, trying signInWithPassword fallback:', checkErr.message);
-      try {
-        await client.signInWithPassword(
-          { apiId: API_ID, apiHash: API_HASH },
-          { 
-            password: () => Promise.resolve(password),
-            onError: (err) => true
-          }
-        );
-      } catch (fallbackErr) {
-        const msg = fallbackErr.errorMessage || fallbackErr.message || checkErr.errorMessage || 'Incorrect 2FA password';
-        const displayMsg = (msg === 'PASSWORD_HASH_INVALID' || msg === 'PASSWORD_EMPTY')
-          ? 'Incorrect 2FA password. Please try again.'
-          : msg;
-        return res.status(400).json({ error: displayMsg, message: displayMsg });
-      }
+      await client.signInWithPassword(
+        { apiId: API_ID, apiHash: API_HASH },
+        { 
+          password: () => Promise.resolve(password),
+          onError: (err) => { throw err; } // Throw actual error (e.g. PASSWORD_HASH_INVALID or FLOOD)
+        }
+      );
+    } catch (authErr) {
+      const msg = authErr.errorMessage || authErr.message || 'Incorrect 2FA password';
+      const displayMsg = (msg === 'PASSWORD_HASH_INVALID' || msg === 'PASSWORD_EMPTY')
+        ? 'Incorrect 2FA password. Please try again.'
+        : msg;
+      return res.status(400).json({ error: displayMsg, message: displayMsg });
     }
 
     // Success — save session
