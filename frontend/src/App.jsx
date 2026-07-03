@@ -5,6 +5,7 @@ import GroupList from './components/GroupList';
 import MessageFeed from './components/MessageFeed';
 import LoginPage from './components/LoginPage';
 import SettingsModal from './components/SettingsModal';
+import AdminPanel from './components/AdminPanel';
 
 export default function App() {
   /* ── State ───────────────────────────────────────────────── */
@@ -20,6 +21,7 @@ export default function App() {
   const [activeTab, setActiveTab] = useState('all'); // 'all' | 'groups' | 'channels' | 'marked'
   const [searchQuery, setSearchQuery] = useState('');
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [adminOpen, setAdminOpen] = useState(false);
 
   /* ── Load groups directly on mount or tab change ─────────── */
   const loadGroupsList = useCallback(async () => {
@@ -44,7 +46,7 @@ export default function App() {
     } finally {
       setLoadingGroups(false);
     }
-  }, [activeTab]); // ONLY activeTab in dependencies!
+  }, [activeTab]);
 
   useEffect(() => {
     loadGroupsList();
@@ -165,6 +167,14 @@ export default function App() {
   /* ── Render Dashboard ───────────────────────────────────── */
   return (
     <div className="app">
+      {/* Admin Panel Modal */}
+      <AdminPanel
+        isOpen={adminOpen}
+        onClose={() => setAdminOpen(false)}
+        groups={groups}
+        onGroupUpdated={loadGroupsList}
+      />
+
       {/* Settings Modal */}
       <SettingsModal
         isOpen={settingsOpen}
@@ -190,6 +200,7 @@ export default function App() {
       {/* Sidebar */}
       <aside className={`sidebar ${sidebarOpen ? 'open' : ''}`}>
         <Header
+          onOpenAdmin={() => setAdminOpen(true)}
           onOpenSettings={() => setSettingsOpen(true)}
           onLogout={handleLogout}
         />

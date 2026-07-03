@@ -98,6 +98,14 @@ export async function fetchGroups() {
   return await res.json();
 }
 
+export async function fetchPublicGroups() {
+  const res = await fetch(`${API_BASE}/api/groups/public`, {
+    headers: getAuthHeaders(),
+  });
+  if (!res.ok) throw new Error(`Failed to fetch public groups (${res.status})`);
+  return await res.json();
+}
+
 export async function fetchMarkedGroups() {
   const res = await fetch(`${API_BASE}/api/groups/marked`, {
     headers: getAuthHeaders(),
@@ -113,6 +121,24 @@ export async function toggleMarkGroup(groupId, marked) {
     body: JSON.stringify({ groupId, marked }),
   });
   if (!res.ok) throw new Error(`Failed to toggle mark (${res.status})`);
+  return await res.json();
+}
+
+export async function publishGroup(groupId, isPublished, inviteLink = null, customTitle = null, name = null) {
+  const res = await fetch(`${API_BASE}/api/groups/publish`, {
+    method: 'POST',
+    headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({ groupId, isPublished, inviteLink, customTitle, name }),
+  });
+  if (!res.ok) throw new Error(`Failed to publish group (${res.status})`);
+  return await res.json();
+}
+
+export async function fetchGroupInviteLink(groupId) {
+  const res = await fetch(`${API_BASE}/api/groups/${encodeURIComponent(groupId)}/invite`, {
+    headers: getAuthHeaders(),
+  });
+  if (!res.ok) throw new Error(`Failed to get invite link (${res.status})`);
   return await res.json();
 }
 

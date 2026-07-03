@@ -1,4 +1,4 @@
-export default function Header({ onOpenSettings, onLogout }) {
+export default function Header({ onOpenAdmin, onOpenSettings, onLogout }) {
   return (
     <div className="header">
       <div className="header-content">
@@ -13,6 +13,25 @@ export default function Header({ onOpenSettings, onLogout }) {
           <p>All your groups in one place</p>
         </div>
         <div style={{ display: 'flex', gap: '6px' }}>
+          {onOpenAdmin && (
+            <button
+              onClick={onOpenAdmin}
+              title="Admin Control Panel"
+              style={{
+                background: 'rgba(56, 189, 248, 0.2)',
+                border: '1px solid rgba(56, 189, 248, 0.4)',
+                color: '#38bdf8',
+                borderRadius: '8px',
+                padding: '0.4rem 0.65rem',
+                fontSize: '0.8rem',
+                fontWeight: 700,
+                cursor: 'pointer',
+                transition: 'all 0.2s',
+              }}
+            >
+              🛡️ Admin
+            </button>
+          )}
           {onOpenSettings && (
             <button
               onClick={onOpenSettings}

@@ -121,7 +121,19 @@ export default function MessageFeed({
       {/* Group Header Info & Options */}
       <div className="message-feed-header">
         <div style={{ flex: 1 }}>
-          <h2>{groupName || 'Select a Group'}</h2>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <h2>{groupName || 'Select a Group'}</h2>
+            {(groupInfo?.inviteLink || groupInfo?.username) && (
+              <a
+                className="join-group-btn"
+                href={groupInfo.inviteLink || `https://t.me/${groupInfo.username}`}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                🚀 Join Telegram
+              </a>
+            )}
+          </div>
           <p>
             {loading
               ? 'Loading messages…'
