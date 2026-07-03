@@ -64,6 +64,10 @@ function getSenderName(message) {
  */
 function formatMessage(message, chatId) {
   const mediaType = getMediaType(message);
+  const hasPhoto = mediaType === 'photo';
+  const hasVideo = mediaType === 'video' || mediaType === 'gif';
+  const hasAudio = mediaType === 'audio';
+  const hasDocument = mediaType === 'document';
 
   return {
     id: message.id,
@@ -73,9 +77,12 @@ function formatMessage(message, chatId) {
     senderName: getSenderName(message),
     hasMedia: !!message.media,
     mediaType,
-    hasPhoto: mediaType === 'photo',
-    hasVideo: mediaType === 'video',
-    // For media download: use chatId + messageId
+    hasPhoto,
+    photo: hasPhoto,
+    hasVideo,
+    video: hasVideo,
+    hasAudio,
+    hasDocument,
     chatId: chatId.toString(),
     isReply: !!message.replyTo,
     replyToMsgId: message.replyTo?.replyToMsgId || null,

@@ -28,6 +28,35 @@ function formatTime(dateStr) {
   }
 }
 
+/**
+ * Convert URLs inside text to clickable anchor links safely.
+ */
+function renderMessageText(text) {
+  if (!text) return null;
+
+  // Regex to match URLs starting with http://, https://, or t.me/
+  const urlRegex = /(https?:\/\/[^\s]+|t\.me\/[^\s]+)/g;
+  const parts = text.split(urlRegex);
+
+  return parts.map((part, index) => {
+    if (part.match(urlRegex)) {
+      const href = part.startsWith('t.me') ? `https://${part}` : part;
+      return (
+        <a
+          key={index}
+          href={href}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="message-link"
+        >
+          {part} ↗
+        </a>
+      );
+    }
+    return part;
+  });
+}
+
 function SkeletonMessages() {
   return (
     <>
@@ -51,15 +80,15 @@ export default function MessageFeed({ messages, groupName, loading, chatId, onLo
 
   /* Auto-scroll to bottom when new messages arrive */
   useEffect(() => {
-    if (feedRef.current && !loading) {
+    if (feedRef.current && !loading && messages.length > 0) {
       feedRef.current.scrollTop = feedRef.current.scrollHeight;
     }
-  }, [messages, loading]);
+  }, [messages.length, loading]);
 
   return (
     <>
       <div className="message-feed-header">
-        <h2>{groupName}</h2>
+        <h2>{groupName || 'Select a Group'}</h2>
         <p>
           {loading
             ? 'Loading messages…'
@@ -81,47 +110,99 @@ export default function MessageFeed({ messages, groupName, loading, chatId, onLo
           <SkeletonMessages />
         ) : messages.length === 0 ? (
           <div className="no-messages">
-            <p>No messages in this group yet.</p>
+            <p>No messages in this chat yet.</p>
           </div>
         ) : (
-          messages.map((msg, index) => (
-            <div
-              key={msg.id || index}
-              className="message"
-              style={{ animationDelay: `${Math.min(index * 0.04, 1)}s` }}
-            >
-              {msg.senderName && (
-                <div className="message-sender">{msg.senderName}</div>
-              )}
+          messages.map((msg, index) => {
+            const isPhoto = msg.hasPhoto || msg.photo || msg.mediaType === 'photo';
+            const isVideo = msg.hasVideo || msg.video || msg.mediaType === 'video' || msg.mediaType === 'gif';
+            const isAudio = msg.hasAudio || msg.mediaType === 'audio';
+            const isDocument = msg.hasDocument || msg.mediaType === 'document';
 
-              {msg.text && <div className="message-text">{msg.text}</div>}
-
-              {/* Photo attachment */}
-              {msg.photo && (
-                <img
-                  className="message-image"
-                  src={getMediaUrl(chatId, msg.id)}
-                  alt="Shared photo"
-                  loading="lazy"
-                />
-              )}
-
-              {/* Video attachment */}
-              {msg.video && (
-                <VideoPlayer
-                  chatId={chatId}
-                  messageId={msg.id}
-                  caption={msg.caption}
-                />
-              )}
-
-              <div className="message-meta">
-                {msg.date && (
-                  <span className="message-time">{formatTime(msg.date)}</span>
+            return (
+              <div
+                key={msg.id || index}
+                className="message"
+                style={{ animationDelay: `${Math.min(index * 0.03, 0.8)}s` }}
+              >
+                {msg.senderName && (
+                  <div className="message-sender">{msg.senderName}</div>
                 )}
+
+                {msg.text && (
+                  <div className="message-text">
+                    {renderMessageText(msg.text)}
+                  </div>
+                )}
+
+                {/* Photo attachment */}
+                {isPhoto && (
+                  <div className="media-container">
+                    <a
+                      href={getMediaUrl(chatId, msg.id)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      title="Open full image"
+                    >
+                      <img
+                        className="message-image"
+                        src={getMediaUrl(chatId, msg.id)}
+                        alt="Shared image"
+                        loading="lazy"
+                      />
+                    </a>
+                  </div>
+                )}
+
+                {/* Video attachment */}
+                {isVideo && (
+                  <div className="media-container">
+                    <VideoPlayer
+                      chatId={chatId}
+                      messageId={msg.id}
+                      caption={msg.caption}
+                    />
+                  </div>
+                )}
+
+                {/* Audio attachment */}
+                {isAudio && (
+                  <div className="media-container audio-container">
+                    <audio
+                      src={getMediaUrl(chatId, msg.id)}
+                      controls
+                      preload="metadata"
+                      style={{ width: '100%', marginTop: '0.5rem' }}
+                    />
+                  </div>
+                )}
+
+                {/* Document attachment */}
+                {isDocument && !isPhoto && !isVideo && !isAudio && (
+                  <div className="media-container document-container">
+                    <a
+                      className="document-download-btn"
+                      href={getMediaUrl(chatId, msg.id)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      download
+                    >
+                      📁 Download Document
+                    </a>
+                  </div>
+                )}
+
+                <div className="message-meta">
+                  {msg.views !== null && msg.views !== undefined && (
+                    <span className="message-views">👁️ {msg.views}</span>
+                  )}
+                  {msg.date && (
+                    <span className="message-time">{formatTime(msg.date)}</span>
+                  )}
+                </div>
               </div>
-            </div>
-          ))
+            );
+          })
         )}
       </div>
     </>
