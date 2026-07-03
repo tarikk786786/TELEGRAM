@@ -3,7 +3,14 @@
   "version": "2.0.0",
   "private": true,
   "scripts": {
+    "postinstall": "cd backend && npm install",
     "build": "cd backend && npm install",
     "start": "cd backend && npm start"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.21.0",
+    "telegram": "^2.26.8"
   }
 }
