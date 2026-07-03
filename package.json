@@ -1,0 +1,9 @@
+{
+  "name": "telegram-hub",
+  "version": "2.0.0",
+  "private": true,
+  "scripts": {
+    "build": "cd backend && npm install",
+    "start": "cd backend && npm start"
+  }
+}
