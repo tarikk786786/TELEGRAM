@@ -213,7 +213,10 @@ router.post('/verify-2fa', async (req, res) => {
       try {
         await client.signInWithPassword(
           { apiId: API_ID, apiHash: API_HASH },
-          { password: () => Promise.resolve(password) }
+          { 
+            password: () => Promise.resolve(password),
+            onError: (err) => true
+          }
         );
       } catch (fallbackErr) {
         const msg = fallbackErr.errorMessage || fallbackErr.message || checkErr.errorMessage || 'Incorrect 2FA password';
