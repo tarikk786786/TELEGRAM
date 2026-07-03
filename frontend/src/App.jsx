@@ -30,20 +30,21 @@ export default function App() {
       const list = Array.isArray(data) ? data : (data?.groups || []);
       setGroups(list);
       setIsUnauthorized(false);
-      if (list.length > 0 && !selectedGroup) {
-        setSelectedGroup(list[0]);
-      }
+      
+      // Update selectedGroup safely without triggering infinite re-renders
+      setSelectedGroup((current) => (current ? current : (list.length > 0 ? list[0] : null)));
     } catch (err) {
       console.error('Failed to load groups:', err);
-      if (err.message.includes('401') || err.message.toLowerCase().includes('authorized')) {
+      const errMsg = err?.message || '';
+      if (errMsg.includes('401') || errMsg.toLowerCase().includes('authorized')) {
         setIsUnauthorized(true);
       } else {
-        setError(err.message || 'Failed to load groups from backend');
+        setError(errMsg || 'Failed to load groups from backend');
       }
     } finally {
       setLoadingGroups(false);
     }
-  }, [activeTab, selectedGroup]);
+  }, [activeTab]); // ONLY activeTab in dependencies!
 
   useEffect(() => {
     loadGroupsList();
@@ -63,16 +64,17 @@ export default function App() {
         setError(null);
         const data = await fetchMessages(selectedGroup.id, 50, 0);
         if (!cancelled) {
-          setMessages(data.messages || []);
-          setHasMore(!!data.hasMore);
+          setMessages(Array.isArray(data?.messages) ? data.messages : []);
+          setHasMore(!!data?.hasMore);
         }
       } catch (err) {
         if (!cancelled) {
           console.error('Failed to load messages:', err);
-          if (err.message.includes('401') || err.message.toLowerCase().includes('authorized')) {
+          const errMsg = err?.message || '';
+          if (errMsg.includes('401') || errMsg.toLowerCase().includes('authorized')) {
             setIsUnauthorized(true);
           } else {
-            setError(err.message || 'Failed to load messages');
+            setError(errMsg || 'Failed to load messages');
           }
         }
       } finally {
@@ -86,9 +88,12 @@ export default function App() {
 
   /* ── Filter groups by tab & search query ────────────────── */
   const filteredGroups = groups.filter((g) => {
+    if (!g) return false;
+    const query = searchQuery.trim().toLowerCase();
     const nameMatches =
-      (g.name || g.title || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (g.username || '').toLowerCase().includes(searchQuery.toLowerCase());
+      !query ||
+      (g.name || g.title || '').toLowerCase().includes(query) ||
+      (g.username || '').toLowerCase().includes(query);
 
     if (!nameMatches) return false;
 
@@ -106,9 +111,9 @@ export default function App() {
 
     try {
       const data = await fetchMessages(selectedGroup.id, 50, lastMsgId);
-      const newMsgs = data.messages || [];
+      const newMsgs = Array.isArray(data?.messages) ? data.messages : [];
       setMessages((prev) => [...prev, ...newMsgs]);
-      setHasMore(!!data.hasMore);
+      setHasMore(!!data?.hasMore);
     } catch (err) {
       console.error('Failed to load more messages:', err);
     }
@@ -249,7 +254,7 @@ export default function App() {
 
         <MessageFeed
           messages={messages}
-          groupName={selectedGroup ? selectedGroup.name : ''}
+          groupName={selectedGroup ? selectedGroup.name || selectedGroup.title || '' : ''}
           chatId={selectedGroup ? selectedGroup.id : ''}
           groupInfo={selectedGroup}
           loading={loadingMessages}
