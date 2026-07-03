@@ -13,15 +13,6 @@ export default function AdminPanel({ groups, onGroupUpdated, isOpen, onClose }) 
   const [savingId, setSavingId] = useState(null);
   const [copiedId, setCopiedId] = useState(null);
 
-  // New Group Form State
-  const [newName, setNewName] = useState('');
-  const [newLink, setNewLink] = useState('');
-  const [newKind, setNewKind] = useState('group'); // 'group' | 'channel'
-  const [newType, setNewType] = useState('public'); // 'public' | 'private'
-  const [newDesc, setNewDesc] = useState('');
-  const [adding, setAdding] = useState(false);
-  const [addMsg, setAddMsg] = useState(null);
-
   useEffect(() => {
     setLocalGroups(groups || []);
   }, [groups]);
@@ -150,38 +141,7 @@ export default function AdminPanel({ groups, onGroupUpdated, isOpen, onClose }) 
     }
   };
 
-  const handleAddCustomGroup = async (e) => {
-    e.preventDefault();
-    if (!newName.trim()) return;
 
-    setAdding(true);
-    setAddMsg(null);
-
-    try {
-      const res = await addCustomGroup(
-        newName.trim(),
-        newLink.trim(),
-        newType,
-        newKind,
-        newDesc.trim()
-      );
-
-      if (res.group) {
-        setLocalGroups((prev) => [res.group, ...prev]);
-        setNewName('');
-        setNewLink('');
-        setNewDesc('');
-        setAddMsg('✅ Group added and published to website!');
-        setTimeout(() => setAddMsg(null), 3000);
-        if (onGroupUpdated) onGroupUpdated();
-      }
-    } catch (err) {
-      console.error('Failed to add custom group:', err);
-      setAddMsg('❌ Failed to add group. Please try again.');
-    } finally {
-      setAdding(false);
-    }
-  };
 
   const handleDeleteGroup = async (groupId) => {
     if (!confirm('Are you sure you want to remove this group link from the public showcase?')) return;
@@ -221,81 +181,7 @@ export default function AdminPanel({ groups, onGroupUpdated, isOpen, onClose }) 
         </div>
 
         <div className="modal-body admin-body">
-          {/* ➕ Add New Group / Channel Form */}
-          <form className="add-group-form" onSubmit={handleAddCustomGroup}>
-            <h3>➕ Add Any Telegram Group or Channel Link</h3>
-            {addMsg && <div className="add-msg">{addMsg}</div>}
-
-            <div className="form-row">
-              <div className="form-field flex-2">
-                <label>Group / Channel Title:</label>
-                <input
-                  type="text"
-                  className="search-input"
-                  placeholder="e.g. VIP Trading Signals"
-                  value={newName}
-                  onChange={(e) => setNewName(e.target.value)}
-                  required
-                />
-              </div>
-
-              <div className="form-field flex-3">
-                <label>Telegram Link or Username (`t.me/...`):</label>
-                <input
-                  type="text"
-                  className="search-input"
-                  placeholder="https://t.me/yourgroup or @username"
-                  value={newLink}
-                  onChange={(e) => setNewLink(e.target.value)}
-                />
-              </div>
-            </div>
-
-            <div className="form-row">
-              <div className="form-field flex-1">
-                <label>Category:</label>
-                <select
-                  className="search-input"
-                  value={newKind}
-                  onChange={(e) => setNewKind(e.target.value)}
-                >
-                  <option value="group">Group</option>
-                  <option value="channel">Channel</option>
-                </select>
-              </div>
-
-              <div className="form-field flex-1">
-                <label>Privacy Type:</label>
-                <select
-                  className="search-input"
-                  value={newType}
-                  onChange={(e) => setNewType(e.target.value)}
-                >
-                  <option value="public">Public</option>
-                  <option value="private">Private</option>
-                </select>
-              </div>
-
-              <div className="form-field flex-2">
-                <label>Short Description (Optional):</label>
-                <input
-                  type="text"
-                  className="search-input"
-                  placeholder="Short description..."
-                  value={newDesc}
-                  onChange={(e) => setNewDesc(e.target.value)}
-                />
-              </div>
-            </div>
-
-            <button type="submit" className="option-btn primary full-width" disabled={adding}>
-              {adding ? 'Adding to Website…' : '🚀 Add & Publish Group Link'}
-            </button>
-          </form>
-
-          <hr className="admin-divider" />
-
-          <h3>📋 Manage Existing & Fetched Groups ({localGroups.length})</h3>
+          <h3>📋 Manage Public Groups ({localGroups.length})</h3>
 
           <div className="admin-group-list">
             {localGroups.map((group) => {
