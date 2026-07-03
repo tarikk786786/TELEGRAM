@@ -103,6 +103,24 @@ function formatGroup(dialog, entity, isMarked, publishMeta = {}) {
   };
 }
 
+// ── Admin Authentication Middleware ───────────────────────────
+const checkAdmin = (req, res, next) => {
+  const token = req.headers['x-admin-token'];
+  if (token === 'admin-token-789') return next();
+  res.status(401).json({ error: 'Unauthorized: Admin access required' });
+};
+
+// ── POST /api/groups/admin-login ────────────────────────────
+router.post('/admin-login', (req, res) => {
+  const { password } = req.body;
+  const adminPassword = process.env.ADMIN_PASSWORD || 'admin123';
+  if (password === adminPassword) {
+    res.json({ success: true, token: 'admin-token-789' });
+  } else {
+    res.status(401).json({ error: 'Invalid admin password' });
+  }
+});
+
 // ── GET /api/groups ─────────────────────────────────────────
 // Fetch ALL groups for Admin (or fallback to published list)
 router.get('/', async (req, res) => {
@@ -252,7 +270,7 @@ router.get('/public', async (req, res) => {
 
 // ── POST /api/groups/publish ────────────────────────────────
 // Admin: Toggle public visibility & update invite link / custom title
-router.post('/publish', async (req, res) => {
+router.post('/publish', checkAdmin, async (req, res) => {
   try {
     const { groupId, isPublished, inviteLink, customTitle, name, description } = req.body;
 
@@ -285,7 +303,7 @@ router.post('/publish', async (req, res) => {
 
 // ── POST /api/groups/add-custom ─────────────────────────────
 // Admin: Add ANY Telegram group, channel, or custom link directly
-router.post('/add-custom', async (req, res) => {
+router.post('/add-custom', checkAdmin, async (req, res) => {
   try {
     const { name, inviteLink, type, kind, description } = req.body;
 
@@ -330,7 +348,7 @@ router.post('/add-custom', async (req, res) => {
 
 // ── POST /api/groups/delete-custom ──────────────────────────
 // Admin: Delete a custom added group
-router.post('/delete-custom', async (req, res) => {
+router.post('/delete-custom', checkAdmin, async (req, res) => {
   try {
     const { groupId } = req.body;
     if (!groupId) return res.status(400).json({ error: 'groupId required' });
@@ -352,7 +370,7 @@ router.post('/delete-custom', async (req, res) => {
 });
 
 // ── POST /api/groups/mark ───────────────────────────────────
-router.post('/mark', async (req, res) => {
+router.post('/mark', checkAdmin, async (req, res) => {
   try {
     const { groupId, marked } = req.body;
 

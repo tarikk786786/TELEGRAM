@@ -1,7 +1,10 @@
 import { useState, useEffect } from 'react';
-import { publishGroup, fetchGroupInviteLink, addCustomGroup, deleteCustomGroup } from '../api';
+import { publishGroup, fetchGroupInviteLink, addCustomGroup, deleteCustomGroup, adminLogin } from '../api';
 
 export default function AdminPanel({ groups, onGroupUpdated, isOpen, onClose }) {
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [password, setPassword] = useState('');
+  const [authError, setAuthError] = useState('');
   const [localGroups, setLocalGroups] = useState(groups || []);
   const [editingGroupId, setEditingGroupId] = useState(null);
   const [customTitle, setCustomTitle] = useState('');
@@ -23,7 +26,63 @@ export default function AdminPanel({ groups, onGroupUpdated, isOpen, onClose }) 
     setLocalGroups(groups || []);
   }, [groups]);
 
+  useEffect(() => {
+    const token = sessionStorage.getItem('admin_token');
+    if (token) {
+      setIsAuthenticated(true);
+    }
+  }, []);
+
   if (!isOpen) return null;
+
+  const handleLogin = async (e) => {
+    e.preventDefault();
+    setAuthError('');
+    try {
+      const res = await adminLogin(password);
+      if (res.success) {
+        sessionStorage.setItem('admin_token', res.token);
+        setIsAuthenticated(true);
+      }
+    } catch (err) {
+      setAuthError('Invalid password. Please try again.');
+    }
+  };
+
+  if (!isAuthenticated) {
+    return (
+      <div className="modal-overlay" onClick={onClose}>
+        <div className="modal-card admin-modal login-modal" onClick={(e) => e.stopPropagation()}>
+          <div className="modal-header">
+            <h2>🛡️ Admin Login</h2>
+            <button className="modal-close-btn" onClick={onClose}>✕</button>
+          </div>
+          <div className="modal-body">
+            <form onSubmit={handleLogin} className="admin-login-form">
+              <p style={{ marginBottom: '1rem', color: '#8b949e' }}>
+                Please enter the admin password to access the control panel.
+              </p>
+              {authError && <div style={{ color: '#ff4d4f', marginBottom: '1rem' }}>{authError}</div>}
+              <div className="form-field">
+                <input
+                  type="password"
+                  className="search-input"
+                  placeholder="Admin Password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  autoFocus
+                />
+              </div>
+              <button type="submit" className="option-btn primary full-width" style={{ marginTop: '1rem' }}>
+                Login
+              </button>
+            </form>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   const handleTogglePublish = async (group) => {
     const nextPublished = !group.isPublished;

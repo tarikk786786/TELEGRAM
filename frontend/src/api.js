@@ -20,6 +20,10 @@ function getAuthHeaders(headers = {}) {
   if (session) {
     headers['x-telegram-session'] = session;
   }
+  const adminToken = sessionStorage.getItem('admin_token');
+  if (adminToken) {
+    headers['x-admin-token'] = adminToken;
+  }
   return headers;
 }
 
@@ -159,6 +163,16 @@ export async function fetchGroupInviteLink(groupId) {
     headers: getAuthHeaders(),
   });
   if (!res.ok) throw new Error(`Failed to get invite link (${res.status})`);
+  return await res.json();
+}
+
+export async function adminLogin(password) {
+  const res = await fetch(`${API_BASE}/api/groups/admin-login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ password }),
+  });
+  if (!res.ok) throw new Error('Invalid password');
   return await res.json();
 }
 
