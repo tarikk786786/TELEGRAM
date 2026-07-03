@@ -3,9 +3,11 @@ import { fetchGroups, fetchMarkedGroups, fetchMessages, toggleMarkGroup } from '
 import Header from './components/Header';
 import GroupList from './components/GroupList';
 import MessageFeed from './components/MessageFeed';
+import LoginPage from './components/LoginPage';
 
 export default function App() {
   /* ── Dashboard state ─────────────────────────────────────── */
+  const [isUnauthorized, setIsUnauthorized] = useState(false);
   const [groups, setGroups] = useState([]);
   const [selectedGroup, setSelectedGroup] = useState(null);
   const [messages, setMessages] = useState([]);
@@ -17,35 +19,32 @@ export default function App() {
   const [activeTab, setActiveTab] = useState('all'); // 'all' | 'marked'
 
   /* ── Load groups directly on mount or tab change ─────────── */
-  useEffect(() => {
-    let cancelled = false;
-
-    async function load() {
-      try {
-        setLoadingGroups(true);
-        setError(null);
-        const data = activeTab === 'marked' ? await fetchMarkedGroups() : await fetchGroups();
-        const list = Array.isArray(data) ? data : (data?.groups || []);
-        if (!cancelled) {
-          setGroups(list);
-          // Auto-select first group if none selected
-          if (list.length > 0 && !selectedGroup) {
-            setSelectedGroup(list[0]);
-          }
-        }
-      } catch (err) {
-        if (!cancelled) {
-          console.error('Failed to load groups:', err);
-          setError(err.message || 'Failed to load groups from backend');
-        }
-      } finally {
-        if (!cancelled) setLoadingGroups(false);
+  const loadGroupsList = useCallback(async () => {
+    try {
+      setLoadingGroups(true);
+      setError(null);
+      const data = activeTab === 'marked' ? await fetchMarkedGroups() : await fetchGroups();
+      const list = Array.isArray(data) ? data : (data?.groups || []);
+      setGroups(list);
+      setIsUnauthorized(false);
+      if (list.length > 0 && !selectedGroup) {
+        setSelectedGroup(list[0]);
       }
+    } catch (err) {
+      console.error('Failed to load groups:', err);
+      if (err.message.includes('401') || err.message.toLowerCase().includes('authorized')) {
+        setIsUnauthorized(true);
+      } else {
+        setError(err.message || 'Failed to load groups from backend');
+      }
+    } finally {
+      setLoadingGroups(false);
     }
+  }, [activeTab, selectedGroup]);
 
-    load();
-    return () => { cancelled = true; };
-  }, [activeTab]);
+  useEffect(() => {
+    loadGroupsList();
+  }, [loadGroupsList]);
 
   /* ── Load messages when selected group changes ──────────── */
   useEffect(() => {
@@ -67,7 +66,11 @@ export default function App() {
       } catch (err) {
         if (!cancelled) {
           console.error('Failed to load messages:', err);
-          setError(err.message || 'Failed to load messages');
+          if (err.message.includes('401') || err.message.toLowerCase().includes('authorized')) {
+            setIsUnauthorized(true);
+          } else {
+            setError(err.message || 'Failed to load messages');
+          }
         }
       } finally {
         if (!cancelled) setLoadingMessages(false);
@@ -119,20 +122,16 @@ export default function App() {
     setSidebarOpen(false);
   }, []);
 
-  /* ── Retry ──────────────────────────────────────────────── */
-  const handleRetry = useCallback(() => {
-    setError(null);
-    if (selectedGroup) {
-      setSelectedGroup({ ...selectedGroup });
-    } else {
-      setLoadingGroups(true);
-      const loadFn = activeTab === 'marked' ? fetchMarkedGroups : fetchGroups;
-      loadFn()
-        .then((data) => setGroups(Array.isArray(data) ? data : (data?.groups || [])))
-        .catch((err) => setError(err.message))
-        .finally(() => setLoadingGroups(false));
-    }
-  }, [selectedGroup, activeTab]);
+  /* ── Handle Login Success ────────────────────────────────── */
+  const handleLoginSuccess = useCallback(() => {
+    setIsUnauthorized(false);
+    loadGroupsList();
+  }, [loadGroupsList]);
+
+  /* ── If Unauthorized, render 1-time setup form ───────────── */
+  if (isUnauthorized) {
+    return <LoginPage onLoginSuccess={handleLoginSuccess} />;
+  }
 
   /* ── Render Dashboard ───────────────────────────────────── */
   return (
@@ -187,7 +186,7 @@ export default function App() {
         {error && (
           <div className="error-banner">
             <span>⚠️ {error}</span>
-            <button onClick={handleRetry}>Retry</button>
+            <button onClick={loadGroupsList}>Retry</button>
           </div>
         )}
 
