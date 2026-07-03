@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { checkAuthStatus, fetchGroups, fetchMarkedGroups, fetchMessages, toggleMarkGroup } from './api';
+import { checkAuthStatus, fetchGroups, fetchMarkedGroups, fetchMessages, toggleMarkGroup, logout } from './api';
 import Header from './components/Header';
 import GroupList from './components/GroupList';
 import MessageFeed from './components/MessageFeed';
@@ -134,6 +134,15 @@ export default function App() {
     }
   }, [selectedGroup, activeTab]);
 
+  /* ── Logout ─────────────────────────────────────────────── */
+  const handleLogout = useCallback(async () => {
+    await logout();
+    setAuthStatus('unauthorized');
+    setSelectedGroup(null);
+    setGroups([]);
+    setMessages([]);
+  }, []);
+
   /* ── Auth checking / unauthorized → Login ────────────────── */
   if (authStatus === 'checking') {
     return (
@@ -170,7 +179,7 @@ export default function App() {
 
       {/* Sidebar */}
       <aside className={`sidebar ${sidebarOpen ? 'open' : ''}`}>
-        <Header />
+        <Header onLogout={handleLogout} />
 
         {/* Tab bar */}
         <div className="tab-bar">

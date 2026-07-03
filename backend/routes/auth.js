@@ -15,7 +15,10 @@ const phoneCodeHashes = new Map();
 router.get('/status', async (req, res) => {
   try {
     const authorized = await client.isUserAuthorized();
-    res.json({ authorized });
+    res.json({
+      authorized,
+      session: authorized ? client.session.save() : null,
+    });
   } catch (err) {
     console.error('Auth status check failed:', err.message);
     res.json({ authorized: false });
@@ -100,8 +103,9 @@ router.post('/verify-code', async (req, res) => {
       saveSession();
       phoneCodeHashes.delete(phoneNumber);
 
+      const sessionStr = client.session.save();
       console.log('✅ Login successful!');
-      res.json({ success: true });
+      res.json({ success: true, session: sessionStr });
     } catch (signInErr) {
       // Check if 2FA is required
       if (signInErr.errorMessage === 'SESSION_PASSWORD_NEEDED') {
@@ -158,8 +162,9 @@ router.post('/verify-2fa', async (req, res) => {
     // Success — save session
     saveSession();
 
+    const sessionStr = client.session.save();
     console.log('✅ 2FA verification successful!');
-    res.json({ success: true });
+    res.json({ success: true, session: sessionStr });
   } catch (err) {
     console.error('❌ 2FA verification failed:', err);
     const msg = err.errorMessage || err.message || 'Incorrect 2FA password';

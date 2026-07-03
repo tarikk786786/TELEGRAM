@@ -63,6 +63,26 @@ app.use(cors({
 
 app.use(express.json());
 
+// ── Session Middleware ──────────────────────────────────────
+// Restores the GramJS user session from x-telegram-session header or query param
+app.use(async (req, res, next) => {
+  const sessionHeader = req.headers['x-telegram-session'] || req.query.session;
+  if (sessionHeader) {
+    try {
+      const currentSession = client.session.save();
+      if (sessionHeader !== currentSession) {
+        client.session = new StringSession(sessionHeader);
+        if (!client.connected) {
+          await client.connect();
+        }
+      }
+    } catch (err) {
+      console.warn('⚠️ Could not restore session from header:', err.message);
+    }
+  }
+  next();
+});
+
 // ── Mount Routes ────────────────────────────────────────────
 const authRoutes = require('./routes/auth');
 const groupsRoutes = require('./routes/groups');
