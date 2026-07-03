@@ -1,15 +1,13 @@
 import { useState, useEffect, useCallback } from 'react';
-import { fetchGroups, fetchMarkedGroups, fetchMessages, toggleMarkGroup, logout } from './api';
+import { fetchGroups, fetchPublicGroups, fetchMarkedGroups, fetchMessages, toggleMarkGroup, logout } from './api';
 import Header from './components/Header';
 import GroupList from './components/GroupList';
 import MessageFeed from './components/MessageFeed';
-import LoginPage from './components/LoginPage';
 import SettingsModal from './components/SettingsModal';
 import AdminPanel from './components/AdminPanel';
 
 export default function App() {
   /* ── State ───────────────────────────────────────────────── */
-  const [isUnauthorized, setIsUnauthorized] = useState(false);
   const [groups, setGroups] = useState([]);
   const [selectedGroup, setSelectedGroup] = useState(null);
   const [messages, setMessages] = useState([]);
@@ -28,21 +26,22 @@ export default function App() {
     try {
       setLoadingGroups(true);
       setError(null);
-      const data = activeTab === 'marked' ? await fetchMarkedGroups() : await fetchGroups();
+      let data;
+      try {
+        data = activeTab === 'marked' ? await fetchMarkedGroups() : await fetchGroups();
+      } catch (err) {
+        console.warn('Main groups fetch failed, attempting public groups fallback:', err.message);
+        data = await fetchPublicGroups().catch(() => []);
+      }
+
       const list = Array.isArray(data) ? data : (data?.groups || []);
       setGroups(list);
-      setIsUnauthorized(false);
       
       // Update selectedGroup safely without triggering infinite re-renders
       setSelectedGroup((current) => (current ? current : (list.length > 0 ? list[0] : null)));
     } catch (err) {
       console.error('Failed to load groups:', err);
-      const errMsg = err?.message || '';
-      if (errMsg.includes('401') || errMsg.toLowerCase().includes('authorized')) {
-        setIsUnauthorized(true);
-      } else {
-        setError(errMsg || 'Failed to load groups from backend');
-      }
+      setError('Could not load groups list.');
     } finally {
       setLoadingGroups(false);
     }
@@ -71,13 +70,8 @@ export default function App() {
         }
       } catch (err) {
         if (!cancelled) {
-          console.error('Failed to load messages:', err);
-          const errMsg = err?.message || '';
-          if (errMsg.includes('401') || errMsg.toLowerCase().includes('authorized')) {
-            setIsUnauthorized(true);
-          } else {
-            setError(errMsg || 'Failed to load messages');
-          }
+          console.warn('Failed to load messages for group:', err.message);
+          setMessages([]);
         }
       } finally {
         if (!cancelled) setLoadingMessages(false);
@@ -147,24 +141,10 @@ export default function App() {
   /* ── Logout Handler ─────────────────────────────────────── */
   const handleLogout = useCallback(async () => {
     await logout();
-    setIsUnauthorized(true);
-    setGroups([]);
-    setMessages([]);
-    setSelectedGroup(null);
-  }, []);
-
-  /* ── Handle Login Success ────────────────────────────────── */
-  const handleLoginSuccess = useCallback(() => {
-    setIsUnauthorized(false);
     loadGroupsList();
   }, [loadGroupsList]);
 
-  /* ── If Unauthorized, render 1-time setup form ───────────── */
-  if (isUnauthorized) {
-    return <LoginPage onLoginSuccess={handleLoginSuccess} />;
-  }
-
-  /* ── Render Dashboard ───────────────────────────────────── */
+  /* ── Render Dashboard Directly (No Login Gate) ────────── */
   return (
     <div className="app">
       {/* Admin Panel Modal */}
