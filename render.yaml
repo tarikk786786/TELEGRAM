@@ -1,7 +1,7 @@
 services:
   - type: web
     name: telegram-hub-backend
-    env: node
+    runtime: node
     rootDir: backend
     buildCommand: npm install
     startCommand: npm start
