@@ -40,18 +40,6 @@ function saveMarkedGroups(markedSet) {
 }
 
 /**
- * Check if an entity is a group or supergroup.
- */
-function isGroup(entity) {
-  if (!entity) return false;
-  const className = entity.className;
-  // Chat = basic group, Channel with megagroup = supergroup
-  if (className === 'Chat') return true;
-  if (className === 'Channel' && entity.megagroup) return true;
-  return false;
-}
-
-/**
  * Check if an entity is a channel (broadcast, not megagroup).
  */
 function isChannel(entity) {
@@ -61,7 +49,6 @@ function isChannel(entity) {
 
 /**
  * Convert a dialog + entity into a JSON-safe group object.
- * GramJS uses BigInt for IDs — we convert to string for JSON.
  */
 function formatGroup(dialog, entity, isMarked) {
   const id = entity.id.toString();
@@ -70,7 +57,7 @@ function formatGroup(dialog, entity, isMarked) {
 
   return {
     id,
-    name: entity.title || 'Untitled',
+    name: entity.title || entity.first_name || 'Untitled Group',
     type,
     kind,
     username: entity.username || null,
@@ -87,7 +74,7 @@ function formatGroup(dialog, entity, isMarked) {
 }
 
 // ── GET /api/groups ─────────────────────────────────────────
-// Fetch ALL groups, supergroups, & channels the user belongs to
+// Fetch ALL groups, supergroups, & channels (public + private + archived)
 router.get('/', async (req, res) => {
   try {
     const authorized = await client.isUserAuthorized();
@@ -97,31 +84,39 @@ router.get('/', async (req, res) => {
 
     const markedSet = loadMarkedGroups();
 
-    console.log('📋 Fetching dialogs...');
-    const dialogs = await client.getDialogs({ limit: 500 });
+    console.log('📋 Fetching main and archived dialogs...');
+    // Fetch main folder dialogs
+    const mainDialogs = await client.getDialogs({});
+    
+    // Fetch archived folder dialogs
+    let archivedDialogs = [];
+    try {
+      archivedDialogs = await client.getDialogs({ folder: 1 });
+    } catch {}
 
+    const allDialogs = [...mainDialogs, ...archivedDialogs];
     const groups = [];
-    for (const dialog of dialogs) {
+    const seenIds = new Set();
+
+    for (const dialog of allDialogs) {
       const entity = dialog.entity;
       if (!entity) continue;
 
-      // Include all Groups, Supergroups, and Channels (exclude 1-on-1 user DMs)
-      const isGroupOrChannel = 
-        dialog.isGroup || 
-        dialog.isChannel || 
-        entity.className === 'Chat' || 
-        entity.className === 'Channel';
+      // Exclude 1-on-1 User DMs (User object has className 'User')
+      // Keep everything else: Chat (basic group), Channel (supergroup or broadcast channel)
+      if (entity.className === 'User') continue;
 
-      if (isGroupOrChannel) {
-        const id = entity.id.toString();
-        groups.push(formatGroup(dialog, entity, markedSet.has(id)));
-      }
+      const id = entity.id.toString();
+      if (seenIds.has(id)) continue;
+      seenIds.add(id);
+
+      groups.push(formatGroup(dialog, entity, markedSet.has(id)));
     }
 
-    console.log(`✅ Found ${groups.length} groups/channels`);
+    console.log(`✅ Found ${groups.length} total groups & channels`);
     res.json(groups);
   } catch (err) {
-    console.error('❌ Failed to fetch groups:', err.message);
+    console.error('❌ Failed to fetch groups:', err);
     res.status(500).json({ error: 'Failed to fetch groups', message: err.message });
   }
 });
@@ -140,22 +135,24 @@ router.get('/marked', async (req, res) => {
       return res.json([]);
     }
 
-    const dialogs = await client.getDialogs({ limit: 500 });
+    const mainDialogs = await client.getDialogs({});
+    let archivedDialogs = [];
+    try {
+      archivedDialogs = await client.getDialogs({ folder: 1 });
+    } catch {}
 
+    const allDialogs = [...mainDialogs, ...archivedDialogs];
     const groups = [];
-    for (const dialog of dialogs) {
+    const seenIds = new Set();
+
+    for (const dialog of allDialogs) {
       const entity = dialog.entity;
-      if (!entity) continue;
-
-      const isGroupOrChannel = 
-        dialog.isGroup || 
-        dialog.isChannel || 
-        entity.className === 'Chat' || 
-        entity.className === 'Channel';
-
-      if (!isGroupOrChannel) continue;
+      if (!entity || entity.className === 'User') continue;
 
       const id = entity.id.toString();
+      if (seenIds.has(id)) continue;
+      seenIds.add(id);
+
       if (markedSet.has(id)) {
         groups.push(formatGroup(dialog, entity, true));
       }
@@ -163,7 +160,7 @@ router.get('/marked', async (req, res) => {
 
     res.json(groups);
   } catch (err) {
-    console.error('❌ Failed to fetch marked groups:', err.message);
+    console.error('❌ Failed to fetch marked groups:', err);
     res.status(500).json({ error: 'Failed to fetch marked groups', message: err.message });
   }
 });
@@ -192,7 +189,7 @@ router.post('/mark', async (req, res) => {
     console.log(`⭐ Group ${id} marked: ${marked}`);
     res.json({ success: true, groupId: id, marked: !!marked });
   } catch (err) {
-    console.error('❌ Failed to toggle mark:', err.message);
+    console.error('❌ Failed to toggle mark:', err);
     res.status(500).json({ error: 'Failed to toggle mark', message: err.message });
   }
 });
