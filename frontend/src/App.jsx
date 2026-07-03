@@ -47,7 +47,8 @@ export default function App() {
         setLoadingGroups(true);
         setError(null);
         const data = activeTab === 'marked' ? await fetchMarkedGroups() : await fetchGroups();
-        if (!cancelled) setGroups(data);
+        const list = Array.isArray(data) ? data : (data?.groups || []);
+        if (!cancelled) setGroups(list);
       } catch (err) {
         if (!cancelled) setError(err.message);
       } finally {
